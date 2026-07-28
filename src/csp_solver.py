@@ -1,6 +1,6 @@
 """CSP solver with domain propagation and MRV branching."""
 from __future__ import annotations
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from numbers import Integral
 from .encoding import parse_clue
@@ -11,11 +11,15 @@ class CspSolveResult:
     solutions:tuple[Matrix,...];exhausted:bool;visited_nodes:int;propagation_rounds:int;removed_patterns:int
     @property
     def solution_count(self)->int:return len(self.solutions)
-def solve_csp(row_clues:Sequence[Sequence[int]],col_clues:Sequence[Sequence[int]],max_solutions:int|None=None)->CspSolveResult:
+def solve_csp(row_clues:Sequence[Sequence[int]],col_clues:Sequence[Sequence[int]],max_solutions:int|None=None,fixed_cells:Mapping[tuple[int,int],int]|None=None)->CspSolveResult:
     if not row_clues or len(row_clues)!=len(col_clues):raise ValueError("clues must define a non-empty square")
     if max_solutions is not None and (isinstance(max_solutions,bool) or not isinstance(max_solutions,Integral) or max_solutions<=0):raise ValueError("max_solutions must be positive or None")
     rows=tuple(parse_clue(c) for c in row_clues);cols=tuple(parse_clue(c) for c in col_clues);n=len(rows)
     initial_rows=[list(generate_patterns(n,c)) for c in rows];initial_cols=[list(generate_patterns(n,c)) for c in cols]
+    for (i,j),value in (fixed_cells or {}).items():
+        if not (0<=i<n and 0<=j<n) or value not in (0,1): raise ValueError("invalid fixed cell")
+        initial_rows[i]=[p for p in initial_rows[i] if p[j]==value]
+        initial_cols[j]=[p for p in initial_cols[j] if p[i]==value]
     solutions=[];nodes=0;rounds=0;removed=0;stopped=False
     def propagate(rd,cd):
         nonlocal rounds,removed
